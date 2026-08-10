@@ -88,6 +88,8 @@ LEGACY_DEFAULT_INSTRUCTION = """任务说明
 2）当时的原因与心理过程（请写具体一些，例如你在想哪个词、哪句结构、还是在组织内容）；
 3）你对上述描述的确信程度（1–7）。
 
+如果选择“生理性停顿”，只需选择该类别，无需填写原因与心理过程或置信度。
+
 描述建议
 - 请尽量描述「当下」的想法，而不是事后合理化。
 - 建议每处约 20–100 字；若确实记不清，可如实写"记不清"，并在置信度上选择较低分数。
@@ -105,6 +107,8 @@ DEFAULT_INSTRUCTION = """任务说明
 2）当时的原因与心理过程（请写具体一些，例如你在想哪个词、哪句结构、还是在组织内容）；
 3）你对上述描述的确信程度（1–7）。
 
+如果选择“生理性停顿”，只需选择该类别，无需填写原因与心理过程或置信度。
+
 描述建议
 - 请尽量描述「当下」的想法，而不是事后合理化。
 - 建议每处约 20–100 字；若确实记不清，可如实写"记不清"，并在置信度上选择较低分数。
@@ -115,6 +119,12 @@ DEFAULT_INSTRUCTION = """任务说明
 
 DEFAULT_ANNOTATABLE_LABELS = ["incomplete", "wait"]
 
+PHYSIOLOGICAL_PAUSE_CATEGORY = "physiological_pause"
+PHYSIOLOGICAL_PAUSE_REASON = {
+    "value": PHYSIOLOGICAL_PAUSE_CATEGORY,
+    "label": "生理性停顿（因换气、咳嗽等生理需要暂时中断表达）",
+}
+
 DEFAULT_REASON_CATEGORIES = [
     {"value": "memory_retrieval", "label": "记忆检索（从记忆中提取过去的经历、事实或其他相关信息）"},
     {"value": "content_planning", "label": "内容规划（规划接下来要表达的内容、信息顺序及具体展开方式）"},
@@ -122,6 +132,7 @@ DEFAULT_REASON_CATEGORIES = [
     {"value": "sentence_organization", "label": "句式组织（选择或重新组织表达当前意思的句式，包括比较不同表达方案、安排词序及确定分句关系）"},
     {"value": "phonological_encoding", "label": "语音编码（准备或确认即将说出的词语的发音形式及语音实现方式）"},
     {"value": "emphatic_pause", "label": "强调性停顿（通过停顿突出后续内容的重要性、对比关系或转折）"},
+    PHYSIOLOGICAL_PAUSE_REASON,
     {"value": "other", "label": "其他"},
 ]
 

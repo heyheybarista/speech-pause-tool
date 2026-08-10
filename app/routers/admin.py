@@ -20,6 +20,7 @@ from app.utils import (
     is_legacy_default_reason_categories, is_annotatable_pause,
     is_annotatable_pause_ms, remove_last_annotatable_pause_tag,
     extract_annotatable_pause_items,
+    PHYSIOLOGICAL_PAUSE_REASON, PHYSIOLOGICAL_PAUSE_CATEGORY,
 )
 
 router = APIRouter(tags=["admin"])
@@ -43,7 +44,15 @@ async def _get_settings(db: AsyncSession) -> dict:
         "reason_categories" not in store
         or is_legacy_default_reason_categories(store["reason_categories"])
     ):
-        store["reason_categories"] = DEFAULT_REASON_CATEGORIES
+        store["reason_categories"] = list(DEFAULT_REASON_CATEGORIES)
+    elif isinstance(store["reason_categories"], list) and not any(
+        isinstance(item, dict) and item.get("value") == PHYSIOLOGICAL_PAUSE_CATEGORY
+        for item in store["reason_categories"]
+    ):
+        store["reason_categories"] = [
+            *store["reason_categories"],
+            dict(PHYSIOLOGICAL_PAUSE_REASON),
+        ]
     return store
 
 

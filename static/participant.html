@@ -29,6 +29,17 @@
   }
   .pause-color-warm { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
   .pause-color-hot  { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
+  .pause-context {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    border-left: 3px solid #f59e0b;
+    background: #fff7ed;
+    color: #7c2d12;
+    font-size: 13px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+  .pause-context-marker { font-weight: 700; color: #9a3412; }
 </style>
 </head>
 <body>
@@ -54,6 +65,7 @@ let sessionData = null;
 let debounceTimers = {};
 // Pending save promises keyed by targetId+field, so submit can flush them first
 const pendingSaves = {};
+const PHYSIOLOGICAL_PAUSE_CATEGORY = 'physiological_pause';
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speechSupported = typeof SpeechRecognition === 'function';
 let activeSpeech = null;
@@ -161,7 +173,7 @@ function updateProgress() {
     const desc = f.querySelector('textarea')?.value.trim();
     const conf = f.querySelector('.confidence-btn.selected')?.dataset?.value;
     // cat must be a real selection (not empty placeholder)
-    if (cat && desc && conf) done++;
+    if (cat === PHYSIOLOGICAL_PAUSE_CATEGORY || (cat && desc && conf)) done++;
   });
   const total = targets.length;
   document.getElementById('progress-text').textContent = `${done}/${total}`;
@@ -311,7 +323,7 @@ function render(data) {
       // One annotation form for every pause target in this utterance.
       for (const t of (u.annotation_targets || [])) {
         const ann = t.annotation || {};
-        html += renderAnnotationForm(t, ann, isReadonly);
+        html += renderAnnotationForm(t, ann, isReadonly, u);
       }
 
       html += '</div></article>';
@@ -333,6 +345,13 @@ function render(data) {
       const textarea = form.querySelector('textarea');
       form.querySelector('select').addEventListener('change', e => {
         autoSave(targetId, 'category', e.target.value);
+        setPhysiologicalPauseMode(form, e.target.value === PHYSIOLOGICAL_PAUSE_CATEGORY);
+        if (e.target.value === PHYSIOLOGICAL_PAUSE_CATEGORY) {
+          textarea.value = '';
+          form.querySelectorAll('.confidence-btn').forEach(b => b.classList.remove('selected'));
+          autoSave(targetId, 'description', '');
+          autoSave(targetId, 'confidence', null);
+        }
       });
       textarea.addEventListener('input', e => {
         autoSave(targetId, 'description', e.target.value);
@@ -358,7 +377,7 @@ function render(data) {
   updateProgress();
 }
 
-function renderAnnotationForm(target, ann, readonly) {
+function renderAnnotationForm(target, ann, readonly, utterance) {
   const categories = JSON.parse(document.getElementById('categories-data')?.textContent || '[]');
   // Placeholder so the first real category is NOT auto-selected without user action
   const placeholder = `<option value="" ${ann.category ? '' : 'selected'} disabled>请选择类别…</option>`;
@@ -374,21 +393,66 @@ function renderAnnotationForm(target, ann, readonly) {
     `<button type="button" class="confidence-btn ${ann.confidence === v ? 'selected' : ''}" data-value="${v}" ${readonly?'disabled':''}>${v}</button>`
   ).join('');
 
+  const physiological = ann.category === PHYSIOLOGICAL_PAUSE_CATEGORY;
+
   return `<div class="annotation-form" data-target-id="${target.id}">
     <div class="target-label">标记：<strong>${escapeHtml(target.display_hint || target.label)}</strong>${target.required ? '（必填）' : ''}</div>
+    ${renderPauseContext(utterance, target)}
     <label>原因类别</label>
     <select ${readonly?'disabled':''}>${catOptions}</select>
-    <label>原因与心理过程</label>
-    <div class="description-input">
-      <textarea rows="3" style="resize:none;overflow-y:auto;" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(ann.description || '')}</textarea>
-      ${!readonly && speechSupported ? `<div class="speech-controls">
-        <button type="button" class="speech-input-btn" aria-label="使用语音输入原因与心理过程" aria-pressed="false">语音输入</button>
-        <span class="speech-status" role="status" aria-live="polite"></span>
-      </div>` : ''}
+    <div class="conditional-annotation-fields" ${physiological ? 'hidden' : ''}>
+      <label>原因与心理过程</label>
+      <div class="description-input">
+        <textarea rows="3" style="resize:none;overflow-y:auto;" placeholder="请描述当时停顿的原因…" ${readonly?'disabled':''}>${escapeHtml(physiological ? '' : (ann.description || ''))}</textarea>
+        ${!readonly && speechSupported ? `<div class="speech-controls">
+          <button type="button" class="speech-input-btn" aria-label="使用语音输入原因与心理过程" aria-pressed="false">语音输入</button>
+          <span class="speech-status" role="status" aria-live="polite"></span>
+        </div>` : ''}
+      </div>
+      <label>你在多大程度上确信该停顿原因的描述？1=完全不确信，7=完全确信</label>
+      <div class="confidence-row">${confHtml}</div>
     </div>
-    <label>你在多大程度上确信该停顿原因的描述？1=完全不确信，7=完全确信</label>
-    <div class="confidence-row">${confHtml}</div>
   </div>`;
+}
+
+function renderPauseContext(utterance, target) {
+  if (target.label !== 'pause') return '';
+  const source = utterance?.raw_text || utterance?.text || '';
+  const pausePattern = /<PAUSE:(\d+(?:\.\d+)?)s>/g;
+  const matches = [...source.matchAll(pausePattern)].filter(match => parseFloat(match[1]) >= 0.5);
+  const targetIndex = Number.isInteger(target.target_index) ? target.target_index : 0;
+  const selected = matches[targetIndex];
+  if (!selected) return '';
+
+  let plain = '';
+  let cursor = 0;
+  let selectedStart = -1;
+  let selectedEnd = -1;
+  matches.forEach((match, index) => {
+    const before = source.slice(cursor, match.index).replace(/<[^>]+>/g, '');
+    plain += before;
+    if (index === targetIndex) selectedStart = plain.length;
+    const marker = `停顿 ${parseFloat(match[1]).toFixed(2)}s`;
+    plain += marker;
+    if (index === targetIndex) selectedEnd = plain.length;
+    cursor = match.index + match[0].length;
+  });
+  plain += source.slice(cursor).replace(/<[^>]+>/g, '');
+
+  if (selectedStart < 0 || selectedEnd < 0) return '';
+  const contextBefore = 42;
+  const contextAfter = 58;
+  const start = Math.max(0, selectedStart - contextBefore);
+  const end = Math.min(plain.length, selectedEnd + contextAfter);
+  const prefix = `${start > 0 ? '…' : ''}${escapeHtml(plain.slice(start, selectedStart))}`;
+  const marker = `<span class="pause-context-marker">${escapeHtml(plain.slice(selectedStart, selectedEnd))}</span>`;
+  const suffix = `${escapeHtml(plain.slice(selectedEnd, end))}${end < plain.length ? '…' : ''}`;
+  return `<div class="pause-context" aria-label="停顿位置上下文">${prefix}${marker}${suffix}</div>`;
+}
+
+function setPhysiologicalPauseMode(form, physiological) {
+  const fields = form.querySelector('.conditional-annotation-fields');
+  if (fields) fields.hidden = physiological;
 }
 
 async function handleSubmit() {

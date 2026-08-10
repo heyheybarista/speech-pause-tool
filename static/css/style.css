@@ -35,6 +35,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .pause-marker { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin: 0 3px; vertical-align: middle; white-space: nowrap; }
 .pause-color-warm { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
 .pause-color-hot { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
+.pause-context { margin: 0 0 10px; padding: 8px 10px; border-left: 3px solid #f59e0b; background: #fff7ed; color: #7c2d12; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.pause-context-marker { font-weight: 700; color: #9a3412; }
 .annotation-form { margin-top: 12px; padding: 14px; background: #fffbeb; border-radius: 10px; border: 1px solid #fcd34d; }
 .annotation-form label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
 .annotation-form select, .annotation-form textarea { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 10px; background: #fff; }

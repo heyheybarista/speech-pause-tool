@@ -198,6 +198,14 @@ def main():
         status, _, patched = request(
             f"/api/a/{access_token}/annotations/{first_target['id']}",
             method="PATCH",
+            body={"category": "physiological_pause"},
+        )
+        expect(status, 200, "patch physiological annotation", patched)
+        assert patched["is_complete"] is True
+
+        status, _, patched = request(
+            f"/api/a/{access_token}/annotations/{first_target['id']}",
+            method="PATCH",
             body={
                 "category": "thinking",
                 "description": "正在组织图片描述。",

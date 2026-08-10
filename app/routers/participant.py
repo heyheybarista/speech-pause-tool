@@ -6,7 +6,10 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Session, Utterance, AnnotationTarget, Annotation
 from app.schemas import ParticipantSessionOut, UtteranceOut, AnnotationTargetOut, PatchAnnotationRequest
-from app.utils import DEFAULT_INSTRUCTION, LABEL_HINTS, LEGACY_DEFAULT_INSTRUCTION
+from app.utils import (
+    DEFAULT_INSTRUCTION, LABEL_HINTS, LEGACY_DEFAULT_INSTRUCTION,
+    PHYSIOLOGICAL_PAUSE_CATEGORY,
+)
 
 router = APIRouter(tags=["participant"])
 
@@ -155,13 +158,19 @@ async def patch_annotation(
     updates = body.model_dump(exclude_unset=True)
     if "category" in updates:
         ann.category = updates["category"]
-    if "description" in updates:
-        ann.description = updates["description"]
-    if "confidence" in updates:
-        ann.confidence = updates["confidence"]
 
-    # Recompute completion: True when all three fields have truthy values
-    ann.is_complete = bool(ann.category and ann.description and ann.confidence)
+    if ann.category == PHYSIOLOGICAL_PAUSE_CATEGORY:
+        ann.description = None
+        ann.confidence = None
+        ann.is_complete = True
+    else:
+        if "description" in updates:
+            ann.description = updates["description"]
+        if "confidence" in updates:
+            ann.confidence = updates["confidence"]
+
+        # Recompute completion: True when all three fields have values
+        ann.is_complete = bool(ann.category and ann.description and ann.confidence)
     ann.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
