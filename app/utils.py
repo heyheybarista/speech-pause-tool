@@ -124,6 +124,7 @@ PHYSIOLOGICAL_PAUSE_REASON = {
     "value": PHYSIOLOGICAL_PAUSE_CATEGORY,
     "label": "生理性停顿（因换气、咳嗽等生理需要暂时中断表达）",
 }
+OTHER_REASON_LABEL = "其他（如转录错误等，请与现场主试说明情况）"
 
 DEFAULT_REASON_CATEGORIES = [
     {"value": "memory_retrieval", "label": "记忆检索（从记忆中提取过去的经历、事实或其他相关信息）"},
@@ -133,7 +134,7 @@ DEFAULT_REASON_CATEGORIES = [
     {"value": "phonological_encoding", "label": "语音编码（准备或确认即将说出的词语的发音形式及语音实现方式）"},
     {"value": "emphatic_pause", "label": "强调性停顿（通过停顿突出后续内容的重要性、对比关系或转折）"},
     PHYSIOLOGICAL_PAUSE_REASON,
-    {"value": "other", "label": "其他"},
+    {"value": "other", "label": OTHER_REASON_LABEL},
 ]
 
 LEGACY_DEFAULT_REASON_CATEGORY_VALUES = (

@@ -21,6 +21,7 @@ from app.utils import (
     is_annotatable_pause_ms, remove_last_annotatable_pause_tag,
     extract_annotatable_pause_items,
     PHYSIOLOGICAL_PAUSE_REASON, PHYSIOLOGICAL_PAUSE_CATEGORY,
+    OTHER_REASON_LABEL,
 )
 
 router = APIRouter(tags=["admin"])
@@ -52,6 +53,18 @@ async def _get_settings(db: AsyncSession) -> dict:
         store["reason_categories"] = [
             *store["reason_categories"],
             dict(PHYSIOLOGICAL_PAUSE_REASON),
+        ]
+    if isinstance(store["reason_categories"], list):
+        store["reason_categories"] = [
+            {
+                **item,
+                "label": OTHER_REASON_LABEL,
+            }
+            if isinstance(item, dict)
+            and item.get("value") == "other"
+            and item.get("label") == "其他"
+            else item
+            for item in store["reason_categories"]
         ]
     return store
 
