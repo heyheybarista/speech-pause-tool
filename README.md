@@ -40,7 +40,9 @@
 | **主试** | 登录后台、确认主试话语、生成并复制被试链接、看进度、导出 CSV/JSON、重置/删除会话、改指导语与类别（管理员）、管理账号（管理员） |
 | **被试** | 用私密链接打开填写页，无需登录；自动暂存；全部填完后提交 |
 
-**当前范围：** 每句话可以包含多个 pause 标注点；每个 pause 都对应一套独立标注表单。暂不包含音频回放、自动发邮件/微信。
+**当前范围：** 每句话可以包含多个 pause 标注点；仅 `≥0.5s` 的停顿会作为 pause 并对应独立标注表单，较短停顿会被忽略。暂不包含音频回放、自动发邮件/微信。
+
+主试确认说话人后，若某条被试话语紧接主试话轮，仅移除该被试话语的最后一个 pause；同一句更早的 pause 仍保留并继续标注。
 
 ---
 
@@ -448,10 +450,10 @@ http://192.168.1.150:8000/a/A3PSYO0TF9VrEnQlIiImV1J_rQ-En0zuzS9X7T84Q0k
       "seq": 2,
       "speaker": "participant",
       "text": "因为小时候我去过那里。",
-      "raw_text": "因为小时候<PAUSE:0.42s>我去过那里<PAUSE:1.15s>。",
+      "raw_text": "因为小时候<PAUSE:0.52s>我去过那里<PAUSE:1.15s>。",
       "pauses": [
-        {"duration": 0.42, "level": "medium"},
-        {"duration": 1.15, "level": "long"}
+        {"duration": 0.52},
+        {"duration": 1.15}
       ]
     },
     {
@@ -474,7 +476,7 @@ http://192.168.1.150:8000/a/A3PSYO0TF9VrEnQlIiImV1J_rQ-En0zuzS9X7T84Q0k
 | `text` | 是 | 转写文本（可不含标签） |
 | `easyturn_label` | 建议有 | 传统话轮标签；没有 `pauses` 时可用于兼容旧版按标签创建目标 |
 | `raw_text` | 可选 | 可含 `<PAUSE:x.xs>`，用于页面显示原始停顿位置 |
-| `pauses` | 推荐 | 当前规范；一个 utterance 可含多个 `{duration, level, ...}` pause |
+| `pauses` | 推荐 | 当前规范；一个 utterance 可含多个 `{duration, ...}` pause，服务端只保留 `≥0.5s` 的停顿 |
 | `extra.pauses` | 兼容 | 旧备份格式；服务端会按与顶层 `pauses` 相同的规则读取 |
 | `pause_duration_ms` | 可选 | 旧版最长停顿字段，仍保留用于兼容 |
 

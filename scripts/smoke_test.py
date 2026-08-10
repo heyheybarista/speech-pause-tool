@@ -97,11 +97,12 @@ def main():
                     "seq": 2,
                     "speaker": "participant",
                     "text": "我看到一个人在窗边思考。",
-                    "raw_text": "我看到一个人<PAUSE:0.42s>在窗边<PAUSE:1.15s>思考。",
+                    "raw_text": "我看到<PAUSE:0.42s>一个人<PAUSE:0.63s>在窗边<PAUSE:1.15s>思考。",
                     "easyturn_label": "complete",
                     "pauses": [
-                        {"duration": 0.42, "level": "medium", "position": 6},
-                        {"duration": 1.15, "level": "long", "position": 22},
+                        {"duration": 0.42, "position": 3},
+                        {"duration": 0.63, "position": 13},
+                        {"duration": 1.15, "position": 26},
                     ],
                 },
                 {
@@ -110,9 +111,7 @@ def main():
                     "text": "然后他转过身。",
                     "easyturn_label": "complete",
                     "extra": {
-                        "pauses": [
-                            {"duration": 0.63, "level": "medium"}
-                        ]
+                        "pauses": [{"duration": 0.63}]
                     },
                 },
             ],
@@ -149,7 +148,7 @@ def main():
         review_items = [
             {
                 "utterance_id": utterance["id"],
-                "speaker": "experimenter" if utterance["seq"] == 2 else "participant",
+                "speaker": "participant" if utterance["seq"] == 2 else "experimenter",
             }
             for utterance in review_detail["utterances"]
         ]
@@ -188,9 +187,12 @@ def main():
             for target in utterance.get("annotation_targets", [])
         ]
         assert len(targets) == 1, participant
-        assert participant["utterances"][1]["speaker"] == "experimenter"
-        assert participant["utterances"][1]["annotation_targets"] == []
-        print("[6/12] Participant API excluded the marked experimenter utterance")
+        assert participant["utterances"][1]["speaker"] == "participant"
+        assert len(participant["utterances"][1]["annotation_targets"]) == 1
+        assert "<PAUSE:0.42s>" not in participant["utterances"][1]["raw_text"]
+        assert "<PAUSE:1.15s>" not in participant["utterances"][1]["raw_text"]
+        assert "<PAUSE:0.63s>" in participant["utterances"][1]["raw_text"]
+        print("[6/12] Final pause before an experimenter turn was removed")
 
         first_target = targets[0]
         status, _, patched = request(
@@ -230,7 +232,7 @@ def main():
         ]
         assert len(admin_targets) == 1, detail
         assert all(target["annotation"]["is_complete"] for target in admin_targets)
-        assert detail["utterances"][1]["speaker"] == "experimenter"
+        assert detail["utterances"][1]["speaker"] == "participant"
         print("[10/12] Admin detail preserved confirmed speakers and annotations")
 
         status, _, csv_text = request(

@@ -17,7 +17,9 @@ from app.auth import get_current_user, require_admin, ADMIN_SESSION_KEY
 from app.utils import (
     generate_token, DEFAULT_INSTRUCTION, DEFAULT_ANNOTATABLE_LABELS,
     DEFAULT_REASON_CATEGORIES, LABEL_HINTS, LEGACY_DEFAULT_INSTRUCTION,
-    is_legacy_default_reason_categories,
+    is_legacy_default_reason_categories, is_annotatable_pause,
+    is_annotatable_pause_ms, remove_last_annotatable_pause_tag,
+    extract_annotatable_pause_items,
 )
 
 router = APIRouter(tags=["admin"])
@@ -60,30 +62,37 @@ def _create_targets_for_utterance(session: Session, utterance: Utterance) -> lis
     pauses = extra.get("pauses")
     if isinstance(pauses, list) and pauses:
         targets = []
-        for index, pause in enumerate(pauses):
+        for pause in pauses:
             if not isinstance(pause, dict):
                 continue
             try:
                 duration = float(pause.get("duration", 0))
             except (TypeError, ValueError):
                 continue
-            if duration < 0:
+            if not is_annotatable_pause(duration):
                 continue
-            level = str(pause.get("level", "unknown"))
             targets.append(AnnotationTarget(
                 id=_new_id(),
                 session_id=session.id,
                 utterance_id=utterance.id,
-                target_index=index,
+                target_index=len(targets),
                 label="pause",
                 required=True,
-                display_hint=f"停顿 {duration:.2f}s ({level})",
+                display_hint=f"停顿 {duration:.2f}s",
                 pause_duration_ms=int(duration * 1000),
             ))
         return targets
 
     label = utterance.easyturn_label
-    if label and label in (session.annotatable_labels or []):
+    pause_duration_ms = extra.get("pause_duration_ms")
+    if (
+        label
+        and label in (session.annotatable_labels or [])
+        and (
+            pause_duration_ms is None
+            or is_annotatable_pause_ms(pause_duration_ms)
+        )
+    ):
         return [AnnotationTarget(
             id=_new_id(),
             session_id=session.id,
@@ -92,9 +101,62 @@ def _create_targets_for_utterance(session: Session, utterance: Utterance) -> lis
             label=label,
             required=True,
             display_hint=LABEL_HINTS.get(label, label),
-            pause_duration_ms=extra.get("pause_duration_ms"),
+            pause_duration_ms=pause_duration_ms,
         )]
     return []
+
+
+def _remove_last_pause_from_utterance(utterance: Utterance) -> None:
+    """Remove the final eligible pause from a participant utterance."""
+    extra = dict(utterance.extra) if isinstance(utterance.extra, dict) else {}
+    pauses = extra.get("pauses")
+    removed_from_list = False
+
+    if isinstance(pauses, list):
+        remaining = list(pauses)
+        for index in range(len(remaining) - 1, -1, -1):
+            pause = remaining[index]
+            if isinstance(pause, dict) and is_annotatable_pause(pause.get("duration")):
+                remaining.pop(index)
+                removed_from_list = True
+                break
+        if remaining:
+            extra["pauses"] = remaining
+            durations = [
+                float(pause.get("duration"))
+                for pause in remaining
+                if isinstance(pause, dict)
+                and is_annotatable_pause(pause.get("duration"))
+            ]
+            if durations:
+                extra["pause_duration_ms"] = int(max(durations) * 1000)
+            else:
+                extra.pop("pause_duration_ms", None)
+        else:
+            extra.pop("pauses", None)
+            extra.pop("pause_duration_ms", None)
+
+    original_raw_text = utterance.raw_text or ""
+    updated_raw_text = remove_last_annotatable_pause_tag(original_raw_text)
+    removed_from_text = updated_raw_text != original_raw_text
+    if removed_from_text:
+        utterance.raw_text = updated_raw_text
+
+    if removed_from_list or removed_from_text:
+        if removed_from_text and not isinstance(pauses, list):
+            remaining = extract_annotatable_pause_items(updated_raw_text)
+            if remaining:
+                extra["pauses"] = remaining
+                extra["pause_duration_ms"] = int(
+                    max(item["duration"] for item in remaining) * 1000
+                )
+            else:
+                # Prevent the legacy label fallback from recreating the removed pause.
+                extra["pause_duration_ms"] = 0
+        elif removed_from_list and not extra.get("pauses"):
+            # The structured list may have contained the only eligible pause.
+            extra["pause_duration_ms"] = 0
+        utterance.extra = extra or None
 
 
 # ── login / logout ─────────────────────────────────────────
@@ -250,9 +312,21 @@ async def confirm_speaker_review(
         await db.execute(delete(Annotation).where(Annotation.target_id == target.id))
     await db.execute(delete(AnnotationTarget).where(AnnotationTarget.session_id == session_id))
 
-    target_count = 0
     for utterance in s.utterances:
         utterance.speaker = speaker_by_id[utterance.id]
+
+    # A pause immediately before a confirmed experimenter turn belongs to the
+    # turn transition rather than the participant's annotatable speech.
+    for index, utterance in enumerate(s.utterances[:-1]):
+        next_utterance = s.utterances[index + 1]
+        if (
+            utterance.speaker == "participant"
+            and next_utterance.speaker == "experimenter"
+        ):
+            _remove_last_pause_from_utterance(utterance)
+
+    target_count = 0
+    for utterance in s.utterances:
         if utterance.speaker != "participant":
             continue
         targets = _create_targets_for_utterance(s, utterance)

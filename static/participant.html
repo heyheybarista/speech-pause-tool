@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>停顿回溯标注</title>
-<link rel="stylesheet" href="/css/style.css?v=2.4">
+<link rel="stylesheet" href="/css/style.css?v=2.5">
 <style>
   .instruction-card { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
   .instruction-card summary { font-weight: 700; cursor: pointer; font-size: 15px; }
@@ -27,9 +27,8 @@
     vertical-align: middle;
     white-space: nowrap;
   }
-  .pause-short  { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
-  .pause-medium { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
-  .pause-long   { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
+  .pause-color-warm { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
+  .pause-color-hot  { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
 </style>
 </head>
 <body>
@@ -418,7 +417,7 @@ function escapeHtml(str) {
 /**
  * 将 utterance 文本渲染为带停顿标注的 HTML。
  * 优先使用 raw_text（含 <PAUSE:x.xs> 标记），否则回退到 text。
- * 停顿时长分级：< 0.35s → short（黄），< 0.80s → medium（橙），≥ 0.80s → long（红）
+ * 仅显示 0.5s 及以上的 pause；不同停顿时长使用不同颜色，不显示等级名称。
  */
 function renderUtteranceText(u) {
   const source = u.raw_text || u.text || '';
@@ -430,8 +429,9 @@ function renderUtteranceText(u) {
     const m = part.match(/^<PAUSE:(\d+(?:\.\d+)?)s>$/);
     if (m) {
       const sec = parseFloat(m[1]);
-      const level = sec >= 0.80 ? 'long' : sec >= 0.35 ? 'medium' : 'short';
-      return `<span class="pause-marker pause-${level}" title="停顿 ${m[1]}s">停顿 ${m[1]}s</span>`;
+      if (sec < 0.5) return '';
+      const color = sec >= 0.80 ? 'hot' : 'warm';
+      return `<span class="pause-marker pause-color-${color}" title="停顿 ${m[1]}s">停顿 ${m[1]}s</span>`;
     }
     return escapeHtml(part);
   }).join('');

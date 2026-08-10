@@ -38,6 +38,9 @@ except ImportError:
     import requests
 
 
+PAUSE_ANNOTATION_THRESHOLD_SECONDS = 0.5
+
+
 class EasyTurnAdapter:
     """Easy-Turn 到停顿标注工具的适配器"""
 
@@ -93,6 +96,7 @@ class EasyTurnAdapter:
                     return
             try:
                 annotated = data.get('annotated_text') or data.get('text', '')
+                annotated = self._remove_short_pause_tags(annotated)
                 if '<TURN_TRANSITION>' in (annotated or ''):
                     utterances = self._split_by_turn_transitions(
                         annotated,
@@ -154,9 +158,16 @@ class EasyTurnAdapter:
         """
         # 提取基本字段
         annotated_text = data.get('annotated_text') or data.get('text', '')
+        annotated_text = self._remove_short_pause_tags(annotated_text)
         transcript = data.get('transcript', '')
         label = data.get('label')
-        pauses = data.get('pauses', [])
+        pauses = []
+        for pause in (data.get('pauses', []) or []):
+            if not isinstance(pause, dict) or not self._is_annotatable_pause(pause.get('duration')):
+                continue
+            normalized = dict(pause)
+            normalized.pop('level', None)
+            pauses.append(normalized)
 
         if not annotated_text and not transcript:
             return None
@@ -287,6 +298,9 @@ class EasyTurnAdapter:
         offset = 0  # 累积已移除标签的字符偏移
         for match in re.finditer(pattern, text):
             duration = float(match.group(1))
+            if not self._is_annotatable_pause(duration):
+                offset += len(match.group(0))
+                continue
             # 停顿在清理后文本中的位置
             position_in_clean = match.start() - offset
             offset += len(match.group(0))
@@ -294,20 +308,26 @@ class EasyTurnAdapter:
             pauses.append({
                 "duration": duration,
                 "kind": "pause",
-                "level": self._classify_pause_level(duration),
                 "position": match.start(),
                 "position_in_clean_text": position_in_clean,
             })
         return pauses
 
-    def _classify_pause_level(self, duration: float) -> str:
-        """停顿时长分级"""
-        if duration < 0.35:
-            return "short"
-        elif duration < 0.80:
-            return "medium"
-        else:
-            return "long"
+    @staticmethod
+    def _is_annotatable_pause(duration) -> bool:
+        try:
+            return float(duration) >= PAUSE_ANNOTATION_THRESHOLD_SECONDS
+        except (TypeError, ValueError):
+            return False
+
+    @classmethod
+    def _remove_short_pause_tags(cls, text: str) -> str:
+        pattern = re.compile(r'<PAUSE:(\d+(?:\.\d+)?)s>')
+        return pattern.sub(
+            lambda match: match.group(0)
+            if cls._is_annotatable_pause(match.group(1)) else '',
+            text or '',
+        )
 
     def _display_utterance(self, utterance: Dict):
         """显示转录结果"""

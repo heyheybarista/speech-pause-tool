@@ -188,8 +188,9 @@ function renderUtteranceText(u) {
     const match = part.match(/^<PAUSE:(\d+(?:\.\d+)?)s>$/);
     if (!match) return esc(part);
     const seconds = parseFloat(match[1]);
-    const level = seconds >= 0.80 ? 'long' : seconds >= 0.35 ? 'medium' : 'short';
-    return `<span class="pause-marker pause-${level}" title="停顿 ${match[1]}s">停顿 ${match[1]}s</span>`;
+    if (seconds < 0.5) return '';
+    const color = seconds >= 0.80 ? 'hot' : 'warm';
+    return `<span class="pause-marker pause-color-${color}" title="停顿 ${match[1]}s">停顿 ${match[1]}s</span>`;
   }).join('');
   return `<p>${inner}</p>`;
 }

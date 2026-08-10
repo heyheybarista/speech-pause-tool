@@ -2,6 +2,63 @@ import re
 import secrets
 
 EASYTURN_LABEL_RE = re.compile(r"<(\w+)>")
+PAUSE_ANNOTATION_THRESHOLD_SECONDS = 0.5
+PAUSE_ANNOTATION_THRESHOLD_MS = int(PAUSE_ANNOTATION_THRESHOLD_SECONDS * 1000)
+
+
+def is_annotatable_pause(duration: object) -> bool:
+    """Return whether a pause is long enough to be treated as a pause."""
+    try:
+        return float(duration) >= PAUSE_ANNOTATION_THRESHOLD_SECONDS
+    except (TypeError, ValueError):
+        return False
+
+
+def is_annotatable_pause_ms(duration_ms: object) -> bool:
+    """Millisecond form of the pause threshold for legacy payloads."""
+    try:
+        return float(duration_ms) >= PAUSE_ANNOTATION_THRESHOLD_MS
+    except (TypeError, ValueError):
+        return False
+
+
+def remove_short_pause_tags(text: str) -> str:
+    """Remove pause markers below the annotation threshold from display text."""
+    pattern = re.compile(r"<PAUSE:(\d+(?:\.\d+)?)s>")
+
+    def replace(match: re.Match[str]) -> str:
+        return match.group(0) if is_annotatable_pause(match.group(1)) else ""
+
+    return pattern.sub(replace, text or "")
+
+
+def remove_last_annotatable_pause_tag(text: str) -> str:
+    """Remove only the final pause marker that meets the pause threshold."""
+    pattern = re.compile(r"<PAUSE:(\d+(?:\.\d+)?)s>")
+    matches = [
+        match for match in pattern.finditer(text or "")
+        if is_annotatable_pause(match.group(1))
+    ]
+    if not matches:
+        return text or ""
+    match = matches[-1]
+    return (text or "")[:match.start()] + (text or "")[match.end():]
+
+
+def extract_annotatable_pause_items(text: str) -> list[dict]:
+    """Extract the remaining eligible pause markers from display text."""
+    pattern = re.compile(r"<PAUSE:(\d+(?:\.\d+)?)s>")
+    items = []
+    for match in pattern.finditer(text or ""):
+        duration = float(match.group(1))
+        if not is_annotatable_pause(duration):
+            continue
+        items.append({
+            "duration": duration,
+            "kind": "pause",
+            "position": match.start(),
+        })
+    return items
 
 
 def generate_token(length: int = 32) -> str:

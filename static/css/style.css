@@ -33,9 +33,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .submission-notice { background: #ecfdf5; border: 1px solid #059669; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; text-align: center; color: #065f46; }
 #submit-btn { min-height: 44px; touch-action: manipulation; }
 .pause-marker { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin: 0 3px; vertical-align: middle; white-space: nowrap; }
-.pause-short { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
-.pause-medium { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
-.pause-long { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
+.pause-color-warm { background: #fed7aa; color: #7c2d12; border: 1px solid #fdba74; }
+.pause-color-hot { background: #fecaca; color: #7f1d1d; border: 1px solid #fca5a5; }
 .annotation-form { margin-top: 12px; padding: 14px; background: #fffbeb; border-radius: 10px; border: 1px solid #fcd34d; }
 .annotation-form label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
 .annotation-form select, .annotation-form textarea { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 10px; background: #fff; }
