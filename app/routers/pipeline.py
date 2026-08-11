@@ -8,7 +8,7 @@ from app.schemas import CreateSessionRequest, CreateSessionResponse
 from app.auth import verify_pipeline_token
 from app.utils import (
     generate_token, parse_easyturn, DEFAULT_ANNOTATABLE_LABELS,
-    DEFAULT_INSTRUCTION, LEGACY_DEFAULT_INSTRUCTION,
+    DEFAULT_INSTRUCTION, is_legacy_default_instruction,
     is_annotatable_pause, is_annotatable_pause_ms, remove_short_pause_tags,
 )
 
@@ -34,7 +34,7 @@ async def create_session(req: CreateSessionRequest, db: AsyncSession = Depends(g
         else settings.get("annotatable_labels", DEFAULT_ANNOTATABLE_LABELS)
     )
     instruction = settings.get("instruction_text", DEFAULT_INSTRUCTION)
-    if instruction == LEGACY_DEFAULT_INSTRUCTION:
+    if is_legacy_default_instruction(instruction):
         instruction = DEFAULT_INSTRUCTION
 
     session = Session(

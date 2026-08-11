@@ -108,9 +108,12 @@ function render() {
   body.innerHTML = detail.utterances.map(u => {
     const annHtml = (u.targets || []).map(t => {
       if (t.annotation) {
+        const categories = Array.isArray(t.annotation.categories)
+          ? t.annotation.categories
+          : (t.annotation.category ? [t.annotation.category] : []);
         return `<div style="margin-top:6px;padding:8px;background:#fefce8;border-radius:6px;font-size:13px;">
           <strong>${esc(t.display_hint || t.label)}</strong>
-          · 类别：${esc(t.annotation.category || '-')}
+          · 类别：${esc(categories.join('、') || '-')}
           · 描述：${esc(t.annotation.description || '-')}
           · 置信度：${t.annotation.confidence != null ? t.annotation.confidence : '-'}
           · ${t.annotation.is_complete ? '完整' : '未完成'}

@@ -91,7 +91,7 @@ const api = {
       const detail = err.detail;
       if (detail && typeof detail === 'object' && detail.incomplete) {
         const hints = detail.incomplete.map(x => x.display_hint || x.target_id).join('、');
-        throw new Error(`还有未完成的标记：${hints}。请检查类别、描述和置信度是否都已填写并保存。`);
+        throw new Error(`还有未完成的标记：${hints}。请检查原因选择、描述和置信度是否都已填写并保存。`);
       }
       throw new Error(typeof detail === 'object' ? JSON.stringify(detail) : (detail || '提交失败'));
     }
@@ -137,24 +137,23 @@ async function flushPendingSaves() {
   // Cancel debounce timers and fire immediate saves for any pending form values
   document.querySelectorAll('.annotation-form').forEach(form => {
     const targetId = form.dataset.targetId;
-    const cat = form.querySelector('select')?.value;
+    const categories = getSelectedCategories(form);
     const desc = form.querySelector('textarea')?.value.trim();
     const conf = form.querySelector('.confidence-btn.selected')?.dataset?.value;
     // Clear pending timers and force immediate PATCH of current values
-    ['category', 'description', 'confidence'].forEach(field => {
+    ['categories', 'description', 'confidence'].forEach(field => {
       const key = targetId + field;
       clearTimeout(debounceTimers[key]);
       delete debounceTimers[key];
+      delete pendingSaves[key];
     });
-    if (cat) {
-      pendingSaves[targetId + 'category'] = api.patch(targetId, { category: cat });
+    const physiological = categories.includes(PHYSIOLOGICAL_PAUSE_CATEGORY);
+    const body = { categories };
+    if (!physiological) {
+      body.description = desc || '';
+      body.confidence = conf ? parseInt(conf) : null;
     }
-    if (desc) {
-      pendingSaves[targetId + 'description'] = api.patch(targetId, { description: desc });
-    }
-    if (conf) {
-      pendingSaves[targetId + 'confidence'] = api.patch(targetId, { confidence: parseInt(conf) });
-    }
+    pendingSaves[targetId + 'form'] = api.patch(targetId, body);
   });
   const pending = Object.values(pendingSaves);
   if (pending.length) {
@@ -169,16 +168,39 @@ function updateProgress() {
   const targets = document.querySelectorAll('.annotation-form');
   let done = 0;
   targets.forEach(f => {
-    const cat = f.querySelector('select')?.value;
+    const categories = getSelectedCategories(f);
     const desc = f.querySelector('textarea')?.value.trim();
     const conf = f.querySelector('.confidence-btn.selected')?.dataset?.value;
-    // cat must be a real selection (not empty placeholder)
-    if (cat === PHYSIOLOGICAL_PAUSE_CATEGORY || (cat && desc && conf)) done++;
+    const physiological = categories.includes(PHYSIOLOGICAL_PAUSE_CATEGORY);
+    if (physiological || (categories.length > 0 && desc && conf)) done++;
   });
   const total = targets.length;
   document.getElementById('progress-text').textContent = `${done}/${total}`;
   document.getElementById('progress-bar').value = total ? (done / total) * 100 : 0;
   document.getElementById('submit-btn').disabled = done < total;
+}
+
+function getSelectedCategories(form) {
+  return [...form.querySelectorAll('.reason-choice-input:checked')]
+    .map(input => input.value);
+}
+
+function syncReasonChoiceState(form, feedback = '', isError = false) {
+  const selected = getSelectedCategories(form);
+  const readonly = form.dataset.readonly === 'true';
+  form.querySelectorAll('.reason-choice-input').forEach(input => {
+    const choice = input.closest('.reason-choice');
+    choice.classList.toggle('selected', input.checked);
+    input.disabled = readonly || (selected.length >= 2 && !input.checked);
+    choice.classList.toggle('disabled', input.disabled && !input.checked);
+  });
+  const count = form.querySelector('.reason-choice-count');
+  if (count) count.textContent = `已选 ${selected.length}/2`;
+  const status = form.querySelector('.reason-choice-feedback');
+  if (status) {
+    status.textContent = feedback;
+    status.classList.toggle('error', isError);
+  }
 }
 
 function setSpeechStatus(statusEl, text, isError = false) {
@@ -343,16 +365,28 @@ function render(data) {
     document.querySelectorAll('.annotation-form').forEach(form => {
       const targetId = form.dataset.targetId;
       const textarea = form.querySelector('textarea');
-      form.querySelector('select').addEventListener('change', e => {
-        autoSave(targetId, 'category', e.target.value);
-        setPhysiologicalPauseMode(form, e.target.value === PHYSIOLOGICAL_PAUSE_CATEGORY);
-        if (e.target.value === PHYSIOLOGICAL_PAUSE_CATEGORY) {
-          textarea.value = '';
-          form.querySelectorAll('.confidence-btn').forEach(b => b.classList.remove('selected'));
-          autoSave(targetId, 'description', '');
-          autoSave(targetId, 'confidence', null);
-        }
+      form.querySelectorAll('.reason-choice-input').forEach(input => {
+        input.addEventListener('change', e => {
+          const selected = getSelectedCategories(form);
+          if (selected.length > 2) {
+            e.target.checked = false;
+            syncReasonChoiceState(form, '最多选择 2 个原因，请先取消一个已选原因。', true);
+            return;
+          }
+          syncReasonChoiceState(form);
+          autoSave(targetId, 'categories', selected);
+          const physiological = selected.includes(PHYSIOLOGICAL_PAUSE_CATEGORY);
+          setPhysiologicalPauseMode(form, physiological);
+          if (physiological) {
+            textarea.value = '';
+            form.querySelectorAll('.confidence-btn').forEach(b => b.classList.remove('selected'));
+            autoSave(targetId, 'description', '');
+            autoSave(targetId, 'confidence', null);
+          }
+          updateProgress();
+        });
       });
+      syncReasonChoiceState(form);
       textarea.addEventListener('input', e => {
         autoSave(targetId, 'description', e.target.value);
       });
@@ -379,27 +413,38 @@ function render(data) {
 
 function renderAnnotationForm(target, ann, readonly, utterance) {
   const categories = JSON.parse(document.getElementById('categories-data')?.textContent || '[]');
-  // Placeholder so the first real category is NOT auto-selected without user action
-  const placeholder = `<option value="" ${ann.category ? '' : 'selected'} disabled>请选择类别…</option>`;
-  const hasCurrentCategory = categories.some(c => c.value === ann.category);
-  const legacyCategory = ann.category && !hasCurrentCategory
-    ? `<option value="${escapeHtml(ann.category)}" selected>历史类别（${escapeHtml(ann.category)}）</option>`
-    : '';
-  const catOptions = placeholder + legacyCategory + categories.map(c =>
-    `<option value="${escapeHtml(c.value)}" ${ann.category === c.value ? 'selected' : ''}>${escapeHtml(c.label)}</option>`
-  ).join('');
+  const selectedCategories = Array.isArray(ann.categories)
+    ? ann.categories
+    : (ann.category ? [ann.category] : []);
+  const knownValues = new Set(categories.map(category => category.value));
+  const legacyCategories = selectedCategories
+    .filter(value => !knownValues.has(value))
+    .map(value => ({ value, label: `历史类别（${value}）` }));
+  const reasonOptions = [...categories, ...legacyCategories].map(category => {
+    const selected = selectedCategories.includes(category.value);
+    return `<label class="reason-choice ${selected ? 'selected' : ''}">
+      <input type="checkbox" class="reason-choice-input" value="${escapeHtml(category.value)}" ${selected ? 'checked' : ''} ${readonly ? 'disabled' : ''}>
+      <span class="reason-choice-text">${escapeHtml(category.label)}</span>
+    </label>`;
+  }).join('');
 
   const confHtml = [1,2,3,4,5,6,7].map(v =>
     `<button type="button" class="confidence-btn ${ann.confidence === v ? 'selected' : ''}" data-value="${v}" ${readonly?'disabled':''}>${v}</button>`
   ).join('');
 
-  const physiological = ann.category === PHYSIOLOGICAL_PAUSE_CATEGORY;
+  const physiological = selectedCategories.includes(PHYSIOLOGICAL_PAUSE_CATEGORY);
 
-  return `<div class="annotation-form" data-target-id="${target.id}">
+  return `<div class="annotation-form" data-target-id="${target.id}" data-readonly="${readonly}">
     <div class="target-label">标记：<strong>${escapeHtml(target.display_hint || target.label)}</strong>${target.required ? '（必填）' : ''}</div>
     ${renderPauseContext(utterance, target)}
-    <label>原因类别</label>
-    <select ${readonly?'disabled':''}>${catOptions}</select>
+    <fieldset class="reason-fieldset">
+      <legend>停顿原因（选择 1–2 项）</legend>
+      <div class="reason-choice-grid">${reasonOptions}</div>
+      <div class="reason-choice-meta">
+        <span class="reason-choice-count">已选 ${selectedCategories.length}/2</span>
+        <span class="reason-choice-feedback" role="status" aria-live="polite"></span>
+      </div>
+    </fieldset>
     <div class="conditional-annotation-fields" ${physiological ? 'hidden' : ''}>
       <label>原因与心理过程</label>
       <div class="description-input">

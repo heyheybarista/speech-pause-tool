@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from app.config import get_settings
-from app.sqlite_migrations import migrate_annotation_targets
+from app.sqlite_migrations import migrate_annotation_categories, migrate_annotation_targets
 
 settings = get_settings()
 # SQLite with aiosqlite, WAL mode
@@ -19,6 +19,7 @@ class Base(DeclarativeBase):
 async def init_db():
     import app.models  # noqa: ensure all models loaded
     migrate_annotation_targets(settings.database_path)
+    migrate_annotation_categories(settings.database_path)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

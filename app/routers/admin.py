@@ -16,12 +16,13 @@ from app.schemas import (
 from app.auth import get_current_user, require_admin, ADMIN_SESSION_KEY
 from app.utils import (
     generate_token, DEFAULT_INSTRUCTION, DEFAULT_ANNOTATABLE_LABELS,
-    DEFAULT_REASON_CATEGORIES, LABEL_HINTS, LEGACY_DEFAULT_INSTRUCTION,
+    DEFAULT_REASON_CATEGORIES, LABEL_HINTS,
     is_legacy_default_reason_categories, is_annotatable_pause,
     is_annotatable_pause_ms, remove_last_annotatable_pause_tag,
     extract_annotatable_pause_items,
     PHYSIOLOGICAL_PAUSE_REASON, PHYSIOLOGICAL_PAUSE_CATEGORY,
-    OTHER_REASON_LABEL,
+    OTHER_REASON_LABEL, get_annotation_reason_categories,
+    is_legacy_default_instruction,
 )
 
 router = APIRouter(tags=["admin"])
@@ -37,7 +38,10 @@ async def _get_settings(db: AsyncSession) -> dict:
     """读取或初始化全局设置"""
     rows = (await db.execute(select(GlobalSetting))).scalars().all()
     store = {r.key: r.value for r in rows}
-    if "instruction_text" not in store or store["instruction_text"] == LEGACY_DEFAULT_INSTRUCTION:
+    if (
+        "instruction_text" not in store
+        or is_legacy_default_instruction(store["instruction_text"])
+    ):
         store["instruction_text"] = DEFAULT_INSTRUCTION
     if "annotatable_labels" not in store:
         store["annotatable_labels"] = DEFAULT_ANNOTATABLE_LABELS
@@ -257,6 +261,10 @@ async def get_session_detail(
         targets = []
         for t in u.annotation_targets:
             ann = t.annotation
+            categories = (
+                get_annotation_reason_categories(ann.category, ann.categories)
+                if ann else []
+            )
             targets.append({
                 "id": t.id,
                 "target_index": t.target_index,
@@ -265,7 +273,8 @@ async def get_session_detail(
                 "display_hint": t.display_hint,
                 "pause_duration_ms": t.pause_duration_ms,
                 "annotation": {
-                    "category": ann.category,
+                    "category": categories[0] if categories else None,
+                    "categories": categories,
                     "description": ann.description,
                     "confidence": ann.confidence,
                     "is_complete": ann.is_complete,
@@ -437,6 +446,10 @@ async def export_session(
         targets = u.annotation_targets or [None]
         for t in targets:
             ann = t.annotation if t else None
+            categories = (
+                get_annotation_reason_categories(ann.category, ann.categories)
+                if ann else []
+            )
             rows.append({
                 "session_id": s.id,
                 "external_participant_id": s.external_participant_id,
@@ -449,7 +462,8 @@ async def export_session(
                 "pause_duration_ms": t.pause_duration_ms if t else None,
                 "target_label": t.label if t else None,
                 "display_hint": t.display_hint if t else None,
-                "category": ann.category if ann else None,
+                "category": categories[0] if categories else None,
+                "categories": categories,
                 "description": ann.description if ann else None,
                 "confidence": ann.confidence if ann else None,
                 "is_complete": ann.is_complete if ann else False,
@@ -458,9 +472,13 @@ async def export_session(
     if format == "csv":
         output = io.StringIO()
         if rows:
-            writer = csv.DictWriter(output, fieldnames=rows[0].keys())
+            csv_rows = [
+                {**row, "categories": "|".join(row["categories"])}
+                for row in rows
+            ]
+            writer = csv.DictWriter(output, fieldnames=csv_rows[0].keys())
             writer.writeheader()
-            writer.writerows(rows)
+            writer.writerows(csv_rows)
         return Response(content=output.getvalue(), media_type="text/csv",
                         headers={"Content-Disposition": f"attachment; filename=session_{session_id}.csv"})
 

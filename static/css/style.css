@@ -40,6 +40,21 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .annotation-form { margin-top: 12px; padding: 14px; background: #fffbeb; border-radius: 10px; border: 1px solid #fcd34d; }
 .annotation-form label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 13px; }
 .annotation-form select, .annotation-form textarea { width: 100%; min-height: 44px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 10px; background: #fff; }
+.reason-fieldset { min-width: 0; margin: 0 0 12px; padding: 0; border: 0; }
+.reason-fieldset legend { margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #1f2937; }
+.reason-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.annotation-form .reason-choice { display: flex; align-items: flex-start; gap: 10px; min-height: 52px; margin: 0; padding: 10px 12px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: #1f2937; cursor: pointer; font-size: 14px; font-weight: 500; line-height: 1.5; touch-action: manipulation; transition: border-color 160ms ease, background-color 160ms ease; }
+.annotation-form .reason-choice:hover { border-color: #93c5fd; background: #f8fafc; }
+.annotation-form .reason-choice.selected { border-color: #2563eb; background: #dbeafe; color: #1e3a8a; }
+.annotation-form .reason-choice.disabled { background: #f3f4f6; color: #6b7280; cursor: not-allowed; opacity: 0.72; }
+.reason-choice-input { width: 20px; height: 20px; margin-top: 1px; flex: 0 0 20px; accent-color: #2563eb; cursor: pointer; }
+.reason-choice-input:disabled { cursor: not-allowed; }
+.reason-choice-input:focus-visible { outline: 3px solid rgba(37,99,235,0.35); outline-offset: 3px; }
+.reason-choice-text { overflow-wrap: anywhere; }
+.reason-choice-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; min-height: 24px; margin-top: 6px; font-size: 12px; }
+.reason-choice-count { color: #4b5563; font-weight: 600; white-space: nowrap; }
+.reason-choice-feedback { color: #6b7280; text-align: right; }
+.reason-choice-feedback.error { color: #b91c1c; }
 .description-input textarea { height: 144px; min-height: 144px; max-height: 144px; margin-bottom: 6px; resize: none; overflow-y: auto; }
 .speech-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-height: 44px; margin-bottom: 10px; }
 .speech-input-btn { min-width: 76px; min-height: 44px; padding: 8px 12px; border: 1px solid #9ca3af; border-radius: 6px; background: #fff; color: #1f2937; cursor: pointer; font-size: 14px; }
@@ -72,6 +87,10 @@ progress::-webkit-progress-value { background: #2563eb; border-radius: 4px; }
   .dialogue-heading h2 { font-size: 18px; }
   .chat-bubble { max-width: 96%; padding: 12px; }
   .annotation-form select, .annotation-form textarea { font-size: 16px; }
+  .reason-choice-grid { grid-template-columns: 1fr; }
+  .annotation-form .reason-choice { min-height: 56px; font-size: 15px; }
+  .reason-choice-meta { flex-direction: column; gap: 2px; }
+  .reason-choice-feedback { text-align: left; }
   .description-input textarea { height: 168px; min-height: 168px; max-height: 168px; font-size: 16px; }
   .speech-status { flex-basis: 100%; }
 }

@@ -98,7 +98,7 @@ LEGACY_DEFAULT_INSTRUCTION = """任务说明
 提交
 所有标记处填写完成后，点击顶部「提交」。提交后不可再修改。填写过程中会自动保存进度，可中途关闭，稍后用同一链接继续。"""
 
-DEFAULT_INSTRUCTION = """任务说明
+SINGLE_REASON_DEFAULT_INSTRUCTION = """任务说明
 下面呈现的是你刚才与主试完成英语口语任务时的对话转录。系统已在你的部分发言处标出你发言时“停顿”的位置。
 
 请你做什么
@@ -116,6 +116,32 @@ DEFAULT_INSTRUCTION = """任务说明
 
 提交
 所有标记处填写完成后，点击顶部「提交」。提交后不可再修改。填写过程中会自动保存进度，可中途关闭，稍后用同一链接继续。"""
+
+DEFAULT_INSTRUCTION = """任务说明
+下面呈现的是你刚才与主试完成英语口语任务时的对话转录。系统已在你的部分发言处标出你发言时“停顿”的位置。
+
+请你做什么
+请依次查看每一处标记。结合前后对话，回忆当时你为什么会这样停顿、犹豫或没有继续说完，并填写：
+1）选择 1–2 个符合当时情况的原因类别；
+2）当时的原因与心理过程（请写具体一些，例如你在想哪个词、哪句结构、还是在组织内容）；
+3）你对上述描述的确信程度（1–7）。
+
+如果所选原因中包含“生理性停顿”，只需选择原因类别，无需填写原因与心理过程或置信度。
+
+描述建议
+- 请尽量描述「当下」的想法，而不是事后合理化。
+- 建议每处约 20–100 字；若确实记不清，可如实写"记不清"，并在置信度上选择较低分数。
+- 主试的发言仅帮助你回忆语境，无需对主试发言作答。
+
+提交
+所有标记处填写完成后，点击顶部「提交」。提交后不可再修改。填写过程中会自动保存进度，可中途关闭，稍后用同一链接继续。"""
+
+
+def is_legacy_default_instruction(instruction: object) -> bool:
+    return instruction in (
+        LEGACY_DEFAULT_INSTRUCTION,
+        SINGLE_REASON_DEFAULT_INSTRUCTION,
+    )
 
 DEFAULT_ANNOTATABLE_LABELS = ["incomplete", "wait"]
 
@@ -136,6 +162,32 @@ DEFAULT_REASON_CATEGORIES = [
     PHYSIOLOGICAL_PAUSE_REASON,
     {"value": "other", "label": OTHER_REASON_LABEL},
 ]
+
+
+def normalize_reason_categories(values: object) -> list[str]:
+    if isinstance(values, str):
+        values = [values]
+    if not isinstance(values, list):
+        return []
+
+    normalized = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        value = value.strip()
+        if value and value not in normalized:
+            normalized.append(value)
+    return normalized
+
+
+def get_annotation_reason_categories(
+    category: object,
+    categories: object,
+) -> list[str]:
+    selected = normalize_reason_categories(categories)
+    if selected:
+        return selected
+    return normalize_reason_categories(category)
 
 LEGACY_DEFAULT_REASON_CATEGORY_VALUES = (
     "lexical", "syntax", "thinking", "intention_shift", "interactive", "external", "other"

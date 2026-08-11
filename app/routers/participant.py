@@ -7,8 +7,9 @@ from app.database import get_db
 from app.models import Session, Utterance, AnnotationTarget, Annotation
 from app.schemas import ParticipantSessionOut, UtteranceOut, AnnotationTargetOut, PatchAnnotationRequest
 from app.utils import (
-    DEFAULT_INSTRUCTION, LABEL_HINTS, LEGACY_DEFAULT_INSTRUCTION,
-    PHYSIOLOGICAL_PAUSE_CATEGORY,
+    DEFAULT_INSTRUCTION, LABEL_HINTS, PHYSIOLOGICAL_PAUSE_CATEGORY,
+    get_annotation_reason_categories, is_legacy_default_instruction,
+    normalize_reason_categories,
 )
 
 router = APIRouter(tags=["participant"])
@@ -25,6 +26,10 @@ def _ensure_speaker_review_complete(session: Session):
 def _build_target_out(target: AnnotationTarget) -> dict:
     """Build the annotation target output dict (including the nested annotation if any)."""
     ann = target.annotation
+    categories = (
+        get_annotation_reason_categories(ann.category, ann.categories)
+        if ann else []
+    )
     return {
         "id": target.id,
         "utterance_id": target.utterance_id,
@@ -34,7 +39,8 @@ def _build_target_out(target: AnnotationTarget) -> dict:
         "display_hint": target.display_hint or LABEL_HINTS.get(target.label, target.label),
         "pause_duration_ms": target.pause_duration_ms,
         "annotation": {
-            "category": ann.category,
+            "category": categories[0] if categories else None,
+            "categories": categories,
             "description": ann.description,
             "confidence": ann.confidence,
             "is_complete": ann.is_complete,
@@ -64,7 +70,7 @@ async def get_participant_session(token: str, db: AsyncSession = Depends(get_db)
     _ensure_speaker_review_complete(session)
 
     instruction = session.instruction_snapshot
-    instruction_changed = instruction == LEGACY_DEFAULT_INSTRUCTION
+    instruction_changed = is_legacy_default_instruction(instruction)
     if instruction_changed:
         instruction = DEFAULT_INSTRUCTION
         session.instruction_snapshot = instruction
@@ -156,10 +162,20 @@ async def patch_annotation(
 
     # Apply only explicitly-provided fields (exclude_unset=True)
     updates = body.model_dump(exclude_unset=True)
-    if "category" in updates:
-        ann.category = updates["category"]
+    if "categories" in updates:
+        categories = normalize_reason_categories(updates["categories"])
+        if len(categories) > 2:
+            raise HTTPException(status_code=422, detail="Select at most two reasons")
+        ann.categories = categories or None
+        ann.category = categories[0] if categories else None
+    elif "category" in updates:
+        categories = normalize_reason_categories(updates["category"])
+        ann.categories = categories or None
+        ann.category = categories[0] if categories else None
+    else:
+        categories = get_annotation_reason_categories(ann.category, ann.categories)
 
-    if ann.category == PHYSIOLOGICAL_PAUSE_CATEGORY:
+    if PHYSIOLOGICAL_PAUSE_CATEGORY in categories:
         ann.description = None
         ann.confidence = None
         ann.is_complete = True
@@ -170,7 +186,7 @@ async def patch_annotation(
             ann.confidence = updates["confidence"]
 
         # Recompute completion: True when all three fields have values
-        ann.is_complete = bool(ann.category and ann.description and ann.confidence)
+        ann.is_complete = bool(categories and ann.description and ann.confidence)
     ann.updated_at = datetime.now(timezone.utc)
 
     await db.commit()

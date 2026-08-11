@@ -195,10 +195,23 @@ def main():
         print("[6/12] Final pause before an experimenter turn was removed")
 
         first_target = targets[0]
+        status, _, rejected = request(
+            f"/api/a/{access_token}/annotations/{first_target['id']}",
+            method="PATCH",
+            body={
+                "categories": [
+                    "memory_retrieval",
+                    "content_planning",
+                    "lexical_retrieval",
+                ]
+            },
+        )
+        expect(status, 422, "reject more than two reasons", rejected)
+
         status, _, patched = request(
             f"/api/a/{access_token}/annotations/{first_target['id']}",
             method="PATCH",
-            body={"category": "physiological_pause"},
+            body={"categories": ["physiological_pause"]},
         )
         expect(status, 200, "patch physiological annotation", patched)
         assert patched["is_complete"] is True
@@ -207,7 +220,7 @@ def main():
             f"/api/a/{access_token}/annotations/{first_target['id']}",
             method="PATCH",
             body={
-                "category": "thinking",
+                "categories": ["content_planning", "lexical_retrieval"],
                 "description": "正在组织图片描述。",
                 "confidence": 6,
             },
@@ -240,6 +253,10 @@ def main():
         ]
         assert len(admin_targets) == 1, detail
         assert all(target["annotation"]["is_complete"] for target in admin_targets)
+        assert admin_targets[0]["annotation"]["categories"] == [
+            "content_planning",
+            "lexical_retrieval",
+        ]
         assert detail["utterances"][1]["speaker"] == "participant"
         print("[10/12] Admin detail preserved confirmed speakers and annotations")
 
@@ -252,6 +269,7 @@ def main():
         assert len(rows) == 3, rows
         assert len(target_rows) == 1, target_rows
         assert {row["target_index"] for row in target_rows} == {"0"}
+        assert target_rows[0]["categories"] == "content_planning|lexical_retrieval"
         print("[11/12] CSV export contains only the released target")
 
         status, _, participant_html = request(f"/a/{access_token}")

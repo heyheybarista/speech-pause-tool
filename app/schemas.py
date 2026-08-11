@@ -56,7 +56,7 @@ class AnnotationTargetOut(BaseModel):
     required: bool
     display_hint: Optional[str] = None
     pause_duration_ms: Optional[int] = None
-    annotation: Optional[dict] = None  # {category, description, confidence, is_complete}
+    annotation: Optional[dict] = None  # {category, categories, description, confidence, is_complete}
 
     model_config = dict(from_attributes=True)
 
@@ -87,6 +87,7 @@ class ParticipantSessionOut(BaseModel):
 
 class PatchAnnotationRequest(BaseModel):
     category: Optional[str] = None
+    categories: Optional[list[str]] = Field(default=None, max_length=2)
     description: Optional[str] = None
     confidence: Optional[int] = Field(default=None, ge=1, le=7)
 

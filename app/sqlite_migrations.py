@@ -112,3 +112,24 @@ def migrate_annotation_targets(database_path: str) -> bool:
         return True
     finally:
         connection.close()
+
+
+def migrate_annotation_categories(database_path: str) -> bool:
+    """Add multi-reason storage while preserving the legacy category column."""
+    db_path = Path(database_path)
+    if not db_path.exists():
+        return False
+
+    connection = sqlite3.connect(str(db_path), timeout=30)
+    try:
+        columns = connection.execute("PRAGMA table_info(annotations)").fetchall()
+        if not columns:
+            return False
+        if "categories" in {row[1] for row in columns}:
+            return False
+
+        connection.execute("ALTER TABLE annotations ADD COLUMN categories JSON")
+        connection.commit()
+        return True
+    finally:
+        connection.close()

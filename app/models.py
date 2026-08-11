@@ -89,6 +89,7 @@ class Annotation(Base):
     id = Column(String(24), primary_key=True, default=_new_id)
     target_id = Column(String(24), ForeignKey("annotation_targets.id"), nullable=False, unique=True)
     category = Column(String(32), nullable=True)
+    categories = Column(JSON, nullable=True)
     description = Column(Text, nullable=True)
     confidence = Column(Integer, nullable=True)
     is_complete = Column(Boolean, default=False)
