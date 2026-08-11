@@ -411,6 +411,15 @@ function render(data) {
   updateProgress();
 }
 
+function renderReasonLabel(label) {
+  const explanationStart = label.indexOf('（');
+  if (explanationStart < 0) {
+    return `<strong class="reason-choice-title">${escapeHtml(label)}</strong>`;
+  }
+  return `<strong class="reason-choice-title">${escapeHtml(label.slice(0, explanationStart))}</strong>` +
+    `<span class="reason-choice-explanation">${escapeHtml(label.slice(explanationStart))}</span>`;
+}
+
 function renderAnnotationForm(target, ann, readonly, utterance) {
   const categories = JSON.parse(document.getElementById('categories-data')?.textContent || '[]');
   const selectedCategories = Array.isArray(ann.categories)
@@ -424,7 +433,7 @@ function renderAnnotationForm(target, ann, readonly, utterance) {
     const selected = selectedCategories.includes(category.value);
     return `<label class="reason-choice ${selected ? 'selected' : ''}">
       <input type="checkbox" class="reason-choice-input" value="${escapeHtml(category.value)}" ${selected ? 'checked' : ''} ${readonly ? 'disabled' : ''}>
-      <span class="reason-choice-text">${escapeHtml(category.label)}</span>
+      <span class="reason-choice-text">${renderReasonLabel(category.label)}</span>
     </label>`;
   }).join('');
 

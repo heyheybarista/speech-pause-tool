@@ -51,6 +51,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft Ya
 .reason-choice-input:disabled { cursor: not-allowed; }
 .reason-choice-input:focus-visible { outline: 3px solid rgba(37,99,235,0.35); outline-offset: 3px; }
 .reason-choice-text { overflow-wrap: anywhere; }
+.reason-choice-title { font-weight: 700; }
+.reason-choice-explanation { font-weight: 400; }
 .reason-choice-meta { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; min-height: 24px; margin-top: 6px; font-size: 12px; }
 .reason-choice-count { color: #4b5563; font-weight: 600; white-space: nowrap; }
 .reason-choice-feedback { color: #6b7280; text-align: right; }

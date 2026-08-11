@@ -94,6 +94,14 @@ try {
 
     const choices = page.locator(".reason-choice");
     assert(await choices.count() === 8, `${viewport.width}px: expected eight visible reasons`);
+    const titles = page.locator(".reason-choice-title");
+    const explanations = page.locator(".reason-choice-explanation");
+    assert(await titles.count() === 8, `${viewport.width}px: expected eight bold reason titles`);
+    assert(await explanations.count() === 8, `${viewport.width}px: expected eight normal-weight explanations`);
+    const titleWeights = await titles.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).fontWeight));
+    const explanationWeights = await explanations.evaluateAll(nodes => nodes.map(node => getComputedStyle(node).fontWeight));
+    assert(titleWeights.every(weight => weight === "700" || weight === "bold"), `${viewport.width}px: reason titles are not bold`);
+    assert(explanationWeights.every(weight => weight === "400" || weight === "normal"), `${viewport.width}px: reason explanations are not normal weight`);
     const minimumHeight = Math.min(...await choices.evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().height)));
     assert(minimumHeight >= 44, `${viewport.width}px: reason touch target is below 44px`);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
