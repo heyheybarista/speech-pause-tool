@@ -93,3 +93,12 @@ python scripts/pipeline_client.py `
 本地快照中包含历史密码、Pipeline token 和私钥文件，不能发布到公开仓库。相关凭据应视为已经泄露，并在 AutoDL / Render 上轮换；`.local-reference/` 只是为了保留排障参考，不是安全存储。
 
 快照中的旧版 web demo 使用 `client_id` 注册机制，而当前适配器还依赖云端的 `final_transcription_broadcast` 广播补丁。发布前应以实际运行的 AutoDL 版本为准，不要把快照当作可直接部署的源码包。
+
+## 句中短词/语气词召回优化
+
+针对 `..., and..., but ...`、`um/uh/umm` 等短词偶发遗漏，当前工作区已做两层处理：
+
+1. [`easyturn_adapter.py`](../../easyturn_adapter.py) 会拒绝同一 `result_id` 下“只丢失短功能词/语气词”的较差高 revision，避免它覆盖已有的完整文本和停顿信息。
+2. 本地 Easy-Turn 快照的 `english_asr.py` 已增加短词保留提示、`beam_size=5`，并在 segment 文本比 word timestamps 更完整时，仅对白名单短词补回保守的估计时间戳。该快照目录被 Git 忽略，修改不会自动上传到 AutoDL。
+
+部署时需要把快照中的 `english_asr.py` 同步到 AutoDL 对应的 Easy-Turn 源码目录，并重启 Easy-Turn 服务；然后用包含 `and / but / umm` 和句中停顿的真实录音复核。若服务端最终的 segment 文本本身已经缺词，仍需要更换或微调 ASR 模型，后处理不能可靠地凭空恢复该词。

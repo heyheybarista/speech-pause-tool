@@ -39,6 +39,12 @@ except ImportError:
 
 
 PAUSE_ANNOTATION_THRESHOLD_SECONDS = 0.5
+SHORT_WORDS_TO_PRESERVE = frozenset({
+    "a", "an", "and", "at", "but", "er", "erm", "for", "from",
+    "in", "like", "of", "on", "or", "so", "the", "to", "uh", "um",
+    "umm", "well",
+})
+ENGLISH_WORD_PATTERN = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)*")
 
 
 class EasyTurnAdapter:
@@ -109,6 +115,13 @@ class EasyTurnAdapter:
                     utterances = [u] if u else []
                 if not utterances:
                     return
+                if result_id and previous and self._is_short_word_regression(
+                        previous['utterances'], utterances):
+                    print(
+                        "⚠ 忽略了一个丢失短词的较差 revision: "
+                        f"result_id={result_id}, revision={revision}"
+                    )
+                    return
                 if result_id:
                     self._result_groups[result_id] = {
                         'revision': revision,
@@ -140,6 +153,64 @@ class EasyTurnAdapter:
         @self.sio.on('error')
         def on_error(data):
             print(f"⚠ Easy-Turn 错误: {data.get('message', data)}")
+
+    @staticmethod
+    def _word_tokens(text: str) -> List[str]:
+        return [
+            token.lower()
+            for token in ENGLISH_WORD_PATTERN.findall(
+                EasyTurnAdapter._clean_annotations(text or '')
+            )
+        ]
+
+    @classmethod
+    def _is_short_word_regression(
+            cls,
+            previous_utterances: List[Dict],
+            current_utterances: List[Dict]) -> bool:
+        """Reject a newer result that only loses short spoken words.
+
+        The ASR service may emit a later result with a shorter transcript. A
+        normal correction is allowed, but a result that is an ordered
+        subsequence of the previous result and differs only by known fillers
+        or function words is treated as a quality regression. This protects
+        pause annotations from being rebuilt around a missing ``and``/``but``
+        while leaving arbitrary ASR corrections untouched.
+        """
+        previous_text = " ".join(
+            str(item.get('text', '')) for item in previous_utterances
+        )
+        current_text = " ".join(
+            str(item.get('text', '')) for item in current_utterances
+        )
+        previous_tokens = cls._word_tokens(previous_text)
+        current_tokens = cls._word_tokens(current_text)
+        if not previous_tokens or not current_tokens:
+            return bool(previous_tokens and not current_tokens)
+        if previous_tokens == current_tokens:
+            return False
+
+        previous_index = 0
+        matched_indexes = []
+        for token in current_tokens:
+            while (
+                    previous_index < len(previous_tokens)
+                    and previous_tokens[previous_index] != token
+            ):
+                previous_index += 1
+            if previous_index >= len(previous_tokens):
+                return False
+            matched_indexes.append(previous_index)
+            previous_index += 1
+
+        matched = set(matched_indexes)
+        missing_tokens = [
+            token for index, token in enumerate(previous_tokens)
+            if index not in matched
+        ]
+        return bool(missing_tokens) and all(
+            token in SHORT_WORDS_TO_PRESERVE for token in missing_tokens
+        )
 
     def _parse_transcription(self, data: Dict) -> Optional[Dict]:
         """
