@@ -193,7 +193,8 @@ function renderUtteranceText(u) {
     const seconds = parseFloat(match[1]);
     if (seconds < 0.5) return '';
     const color = seconds >= 0.80 ? 'hot' : 'warm';
-    return `<span class="pause-marker pause-color-${color}" title="停顿 ${match[1]}s">停顿 ${match[1]}s</span>`;
+    const displaySeconds = seconds.toFixed(3);
+    return `<span class="pause-marker pause-color-${color}" title="停顿 ${displaySeconds}s">停顿 ${displaySeconds}s</span>`;
   }).join('');
   return `<p>${inner}</p>`;
 }

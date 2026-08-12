@@ -166,6 +166,7 @@ class EasyTurnAdapter:
             if not isinstance(pause, dict) or not self._is_annotatable_pause(pause.get('duration')):
                 continue
             normalized = dict(pause)
+            normalized['duration'] = round(float(normalized['duration']), 3)
             normalized.pop('level', None)
             pauses.append(normalized)
 
@@ -306,7 +307,7 @@ class EasyTurnAdapter:
             offset += len(match.group(0))
 
             pauses.append({
-                "duration": duration,
+                "duration": round(duration, 3),
                 "kind": "pause",
                 "position": match.start(),
                 "position_in_clean_text": position_in_clean,
@@ -349,7 +350,7 @@ class EasyTurnAdapter:
         print(f"    {text}")
 
         if pauses:
-            pause_str = ", ".join([f"{p['duration']:.2f}s" for p in pauses])
+            pause_str = ", ".join([f"{p['duration']:.3f}s" for p in pauses])
             print(f"    停顿: {pause_str}")
 
     def connect(self):

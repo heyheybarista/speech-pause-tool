@@ -54,3 +54,16 @@ demo_utterances.json
 
 # AI tools
 .superpowers/
+.claude/
+
+# Local generated outputs and temporary work files
+output/
+tmp/
+
+# Local experiment exports and preview images
+/*.csv
+/*（当前停顿逻辑标记）.html
+/pause-export-preview.png
+/*.xlsx
+/*.xls
+/scripts/export_pause_decisions_libreoffice.ps1
