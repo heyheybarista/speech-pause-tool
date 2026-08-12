@@ -5,6 +5,18 @@ from contextlib import redirect_stdout
 from easyturn_adapter import EasyTurnAdapter
 
 
+class FakeSocketIO:
+    def __init__(self):
+        self.handlers = {}
+
+    def on(self, event_name):
+        def register(handler):
+            self.handlers[event_name] = handler
+            return handler
+
+        return register
+
+
 class ShortWordRegressionTests(unittest.TestCase):
     def utterance(self, text):
         return [{"text": text}]
@@ -58,11 +70,13 @@ class ShortWordRegressionTests(unittest.TestCase):
 
     def test_parse_failure_does_not_dump_raw_json(self):
         adapter = EasyTurnAdapter.__new__(EasyTurnAdapter)
+        adapter.sio = FakeSocketIO()
+        adapter._result_groups = {}
         output = io.StringIO()
 
         with redirect_stdout(output):
             adapter._register_handlers()
-            adapter.sio.handlers["/"]["final_transcription"][0]({
+            adapter.sio.handlers["final_transcription"]({
                 "text": object(),
                 "result_id": "private-result-id",
                 "acoustic_duration": 0.262,
