@@ -101,7 +101,9 @@ class EasyTurnAdapter:
                 if previous and revision <= previous['revision']:
                     return
             try:
-                annotated = data.get('annotated_text') or data.get('text', '')
+                annotated = self._coerce_text(
+                    data.get('annotated_text') or data.get('text', '')
+                )
                 annotated = self._remove_short_pause_tags(annotated)
                 if '<TURN_TRANSITION>' in (annotated or ''):
                     utterances = self._split_by_turn_transitions(
@@ -230,9 +232,11 @@ class EasyTurnAdapter:
         }
         """
         # 提取基本字段
-        annotated_text = data.get('annotated_text') or data.get('text', '')
+        annotated_text = self._coerce_text(
+            data.get('annotated_text') or data.get('text', '')
+        )
         annotated_text = self._remove_short_pause_tags(annotated_text)
-        transcript = data.get('transcript', '')
+        transcript = self._coerce_text(data.get('transcript', ''))
         label = data.get('label')
         pauses = []
         for pause in (data.get('pauses', []) or []):
@@ -353,6 +357,24 @@ class EasyTurnAdapter:
         self.sequence_counter = len(flattened)
         self.utterances = flattened
 
+    @staticmethod
+    def _coerce_text(value) -> str:
+        """Extract displayable text without rendering structured event data."""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            for key in ('annotated_text', 'text', 'transcript'):
+                text = EasyTurnAdapter._coerce_text(value.get(key))
+                if text:
+                    return text
+            return ''
+        if isinstance(value, (list, tuple)):
+            return ' '.join(
+                text for item in value
+                if (text := EasyTurnAdapter._coerce_text(item))
+            )
+        return ''
+
     def _clean_annotations(self, text: str) -> str:
         """清理文本中的标注标记"""
         # 移除 <PAUSE:x.xxs>
@@ -406,8 +428,9 @@ class EasyTurnAdapter:
     def _display_utterance(self, utterance: Dict):
         """显示转录结果"""
         seq = utterance['seq']
-        text = self._clean_annotations(
-            str(utterance.get('text') or utterance.get('raw_text') or '')
+        raw_text = self._coerce_text(utterance.get('raw_text'))
+        text = self._coerce_text(
+            utterance.get('text') or raw_text
         )
         label = utterance.get('easyturn_label') or 'unknown'
         pauses = utterance.get('pauses', [])
@@ -426,7 +449,13 @@ class EasyTurnAdapter:
             for p in pauses
             if self._is_annotatable_pause(p.get('duration'))
         )
-        display_text = " ".join(part for part in (text, pause_tags) if part)
+        display_text = self._remove_short_pause_tags(raw_text).strip()
+        if not display_text:
+            display_text = self._clean_annotations(text)
+        if pause_tags and not re.search(r'<PAUSE:\d+(?:\.\d+)?s>', display_text):
+            display_text = " ".join(
+                part for part in (display_text, pause_tags) if part
+            )
 
         print(f"\n[{seq}] {color}{label.upper()}{reset}")
         print(f"    {display_text}")

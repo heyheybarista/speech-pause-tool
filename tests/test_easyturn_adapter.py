@@ -62,7 +62,7 @@ class ShortWordRegressionTests(unittest.TestCase):
 
         rendered = output.getvalue()
         self.assertIn(
-            "I wanted to explain this, and then continue <PAUSE:0.750s>",
+            "I wanted to explain this, and <PAUSE:0.750s> then continue",
             rendered,
         )
         self.assertNotIn("acoustic_duration", rendered)
@@ -77,9 +77,9 @@ class ShortWordRegressionTests(unittest.TestCase):
         with redirect_stdout(output):
             adapter._register_handlers()
             adapter.sio.handlers["final_transcription"]({
-                "text": object(),
+                "text": "A readable transcript",
                 "result_id": "private-result-id",
-                "acoustic_duration": 0.262,
+                "label": object(),
             })
 
         rendered = output.getvalue()
