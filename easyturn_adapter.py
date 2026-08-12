@@ -138,7 +138,9 @@ class EasyTurnAdapter:
                     self._display_utterance(u)
             except Exception as e:
                 print(f"⚠ 解析转录结果失败: {e}")
-                print(f"   原始数据: {json.dumps(data, ensure_ascii=False, indent=2)}")
+                # Keep the terminal focused on readable transcript output. The
+                # complete event is still available in the local JSON backup.
+                print("   已跳过这条异常转录；完整事件已保留在本地备份中。")
 
         # 全局广播事件（服务端为外部脚本额外发送的一份）
         @self.sio.on('final_transcription_broadcast')
@@ -404,7 +406,9 @@ class EasyTurnAdapter:
     def _display_utterance(self, utterance: Dict):
         """显示转录结果"""
         seq = utterance['seq']
-        text = utterance['text']
+        text = self._clean_annotations(
+            str(utterance.get('text') or utterance.get('raw_text') or '')
+        )
         label = utterance.get('easyturn_label') or 'unknown'
         pauses = utterance.get('pauses', [])
 
@@ -417,12 +421,15 @@ class EasyTurnAdapter:
         color = label_colors.get(label, '\033[0m')
         reset = '\033[0m'
 
-        print(f"\n[{seq}] {color}{label.upper()}{reset}")
-        print(f"    {text}")
+        pause_tags = " ".join(
+            f"<PAUSE:{float(p['duration']):.3f}s>"
+            for p in pauses
+            if self._is_annotatable_pause(p.get('duration'))
+        )
+        display_text = " ".join(part for part in (text, pause_tags) if part)
 
-        if pauses:
-            pause_str = ", ".join([f"{p['duration']:.3f}s" for p in pauses])
-            print(f"    停顿: {pause_str}")
+        print(f"\n[{seq}] {color}{label.upper()}{reset}")
+        print(f"    {display_text}")
 
     def connect(self):
         """连接到 Easy-Turn 服务"""
