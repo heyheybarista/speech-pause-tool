@@ -444,7 +444,7 @@ function renderAnnotationForm(target, ann, readonly, utterance) {
   const physiological = selectedCategories.includes(PHYSIOLOGICAL_PAUSE_CATEGORY);
 
   return `<div class="annotation-form" data-target-id="${target.id}" data-readonly="${readonly}">
-    <div class="target-label">标记：<strong>${escapeHtml(target.display_hint || target.label)}</strong>${target.required ? '（必填）' : ''}</div>
+    <div class="target-label">标记：<strong>${escapeHtml(renderTargetDisplayHint(target))}</strong>${target.required ? '（必填）' : ''}</div>
     ${renderPauseContext(utterance, target)}
     <fieldset class="reason-fieldset">
       <legend>停顿原因（选择 1–2 项）</legend>
@@ -530,6 +530,14 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str || '';
   return div.innerHTML;
+}
+
+function renderTargetDisplayHint(target) {
+  const durationMs = Number(target.pause_duration_ms);
+  if (target.label === 'pause' && Number.isFinite(durationMs)) {
+    return `停顿 ${(durationMs / 1000).toFixed(3)}s`;
+  }
+  return target.display_hint || target.label;
 }
 
 /**

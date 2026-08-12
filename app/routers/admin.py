@@ -104,7 +104,7 @@ def _create_targets_for_utterance(session: Session, utterance: Utterance) -> lis
                 target_index=len(targets),
                 label="pause",
                 required=True,
-                display_hint=f"停顿 {duration:.2f}s",
+                display_hint=f"停顿 {duration:.3f}s",
                 pause_duration_ms=int(duration * 1000),
             ))
         return targets
